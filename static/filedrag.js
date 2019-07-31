@@ -1,11 +1,7 @@
 (function() {
-	// getElementById
-	function $id(id) {
-		return document.getElementById(id);
-	}
 	// output information
 	function Output(msg) {
-		var m = $id("messages");
+		var m = document.getElementById("messages");
 		m.innerHTML = msg + m.innerHTML;
 	}
 	// file drag hover
@@ -36,9 +32,9 @@
 	}
 	// initialize
 	function Init() {
-		var fileselect = $id("fileselect"),
-			filedrag = $id("filedrag"),
-			submitbutton = $id("submitbutton");
+		var fileselect = document.getElementById("fileselect"),
+			filedrag = document.getElementById("filedrag"),
+			submitbutton = document.getElementById("submitbutton");
 		// file select
 		fileselect.addEventListener("change", FileSelectHandler, false);
 		// is XHR2 available?
@@ -49,8 +45,6 @@
 			filedrag.addEventListener("dragleave", FileDragHover, false);
 			filedrag.addEventListener("drop", FileSelectHandler, false);
 			filedrag.style.display = "block";
-			// remove submit button
-			//submitbutton.style.display = "none";
 		}
 	}
 	// call initialization file
