@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, Response
+from flask import Flask, request, send_file, Response, flash, render_template
 from pypandoc import convert_text
 from os import path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
@@ -8,38 +8,54 @@ from io import BytesIO
 app = Flask(__name__)
 
 
-@app.route('/result.md', methods=['GET', 'POST'])
+@app.route('/', methods=['GET', 'POST'])
 def root():
-    if request.type == 'GET':
-        return app.send_static_file('index.html')
-    elif request.type == 'POST':
-        file_list = request.files.getlist('fileselect[]')
+    if request.method == 'GET':
+        return render_template('index.html')
+    elif request.method == 'POST':
+        print(request.__dict__)
+        file_list = request.files.getlist('files[]')
+
+        # Return single file
         if len(file_list) == 0:
-            return 'No'
+            print('No FILE')
+            return render_template('index.html', error='No files selected')
         elif len(file_list) == 1:
-            file = request.files.getlist('fileselect[]')[0]
+            file = file_list[0]
 
             # Get file name and type
             filename = path.splitext(file.filename)[0]
-            filetype = path.splitext(file.filename)[1].strip('.')
+            file_type = path.splitext(file.filename)[1].strip('.')
 
-            # Convert to markdown
-            markdown = convert_text(file.stream.read(), 'md', filetype)
+            try:  # Convert to markdown
+                markdown = convert_text(file.stream.read(), 'md', file_type)
+            except RuntimeError as e:
+                if e.args[0].startswith('Invalid input format!'):
+                    return render_template('index.html', unsupported=file_type.upper())
+                else:
+                    return render_template('index.html', error=True)
 
             # Send markdown file as attachment
             return Response(markdown, mimetype='text/markdown',
                             headers={'Content-Disposition': 'attachment;filename={}.md'.format(filename)})
-        else:
+
+        # Return zip file
+        elif len(file_list) > 1:
             memory_file = BytesIO()
             with ZipFile(memory_file, 'w') as zf:
-                for file in request.files.getlist('fileselect[]'):
+                for file in file_list:
 
                     # Get file name and file type
                     filename = path.splitext(file.filename)[0]
-                    filetype = path.splitext(file.filename)[1].strip('.')
+                    file_type = path.splitext(file.filename)[1].strip('.')
 
-                    # Convert to markdown
-                    markdown = convert_text(file.stream.read(), 'md', filetype)
+                    try:  # Convert to markdown
+                        markdown = convert_text(file.stream.read(), 'md', file_type)
+                    except RuntimeError as e:
+                        if e.args[0].startswith('Invalid input format!'):
+                            return render_template('index.html', unsupported=file_type.upper())
+                        else:
+                            return render_template('index.html', error=True)
 
                     # Write File to Zipfile
                     data = ZipInfo('{}.md'.format(filename))
@@ -50,6 +66,8 @@ def root():
             # Send zip file as attachment
             memory_file.seek(0)
             return send_file(memory_file, attachment_filename='results.zip', as_attachment=True)
+        else:
+            return render_template('index.html')
 
 
 if __name__ == "__main__":
