@@ -8,6 +8,7 @@
         return (('draggable' in div) || ('ondragstart' in div && 'ondrop' in div)) && 'FormData' in window && 'FileReader' in window;
     }();
 
+
     // applying the effect for every form
     var forms = document.querySelectorAll('.box');
     Array.prototype.forEach.call(forms, function(form) {
@@ -17,7 +18,6 @@
             restart = form.querySelectorAll('.box__restart'),
             droppedFiles = false,
             showFiles = function(files) {
-                console.log(files[0].name);
                 label.textContent = files.length > 1 ? (input.getAttribute('data-multiple-caption') || '').replace('{count}', files.length) : files[0].name;
             },
             triggerFormSubmit = function() {
@@ -26,7 +26,7 @@
                 form.dispatchEvent(event);
             };
 
-        // letting the server side know we are going to make an Ajax request
+        // letting the server side to know we are going to make an Ajax request
         var ajaxFlag = document.createElement('input');
         ajaxFlag.setAttribute('type', 'hidden');
         ajaxFlag.setAttribute('name', 'ajax');
@@ -36,7 +36,8 @@
         // automatically submit the form on file select
         input.addEventListener('change', function(e) {
             showFiles(e.target.files);
-            triggerFormSubmit();
+
+
         });
 
         // drag&drop files if the feature is available
@@ -63,7 +64,7 @@
             form.addEventListener('drop', function(e) {
                 droppedFiles = e.dataTransfer.files; // the files that were dropped
                 showFiles(droppedFiles);
-                triggerFormSubmit();
+
             });
         }
 
@@ -94,11 +95,50 @@
 
                 ajax.onload = function() {
                     form.classList.remove('is-uploading');
-                    if (ajax.status >= 200 && ajax.status < 400) {
-                        var data = JSON.parse(ajax.responseText);
-                        form.classList.add(data.success == true ? 'is-success' : 'is-error');
-                        if (!data.success) errorMsg.textContent = data.error;
-                    } else alert('Error. Please, contact the webmaster!');
+                    
+                    if (this.status === 200) {
+                        var filename = "";
+                        var disposition = ajax.getResponseHeader('Content-Disposition');
+                        if (disposition && disposition.indexOf('attachment') !== -1) {
+                            // Server returned attachment
+                            form.classList.add('is-success');
+                            var filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                            var matches = filenameRegex.exec(disposition);
+                            if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
+                            
+                            var type = ajax.getResponseHeader('Content-Type');
+                    
+                            var blob = typeof File === 'function'
+                                ? new File([this.response], filename, { type: type })
+                                : new Blob([this.response], { type: type });
+                            if (typeof window.navigator.msSaveBlob !== 'undefined') {
+                                window.navigator.msSaveBlob(blob, filename);
+                            } else {
+                                var URL = window.URL || window.webkitURL;
+                                var downloadUrl = URL.createObjectURL(blob);
+                    
+                                if (filename) {
+                                    // use HTML5 a[download] attribute to specify filename
+                                    var a = document.createElement("a");
+                                    // safari doesn't support this yet
+                                    if (typeof a.download === 'undefined') {
+                                        window.location = downloadUrl;
+                                    } else {
+                                        a.href = downloadUrl;
+                                        a.download = filename;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                    }
+                                } else {
+                                    window.location = downloadUrl;
+                                }
+                                setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 100); // cleanup
+                            }
+                        } else {
+                            errorMsg.textContent = ajax.responseText;
+                            form.classList.add('is-error');
+                        }
+                    }
                 };
 
                 ajax.onerror = function() {
@@ -107,30 +147,8 @@
                 };
 
                 ajax.send(ajaxData);
-            } else // fallback Ajax solution upload for older browsers
-            {
-                var iframeName = 'uploadiframe' + new Date().getTime(),
-                    iframe = document.createElement('iframe');
-
-                $iframe = $('<iframe name="' + iframeName + '" style="display: none;"></iframe>');
-
-                iframe.setAttribute('name', iframeName);
-                iframe.style.display = 'none';
-
-                document.body.appendChild(iframe);
-                form.setAttribute('target', iframeName);
-
-                iframe.addEventListener('load', function() {
-                    var data = JSON.parse(iframe.contentDocument.body.innerHTML);
-                    form.classList.remove('is-uploading')
-                    form.classList.add(data.success == true ? 'is-success' : 'is-error')
-                    form.removeAttribute('target');
-                    if (!data.success) errorMsg.textContent = data.error;
-                    iframe.parentNode.removeChild(iframe);
-                });
             }
         });
-
 
         // restart the form if has a state of error/success
         Array.prototype.forEach.call(restart, function(entry) {
