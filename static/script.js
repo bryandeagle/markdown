@@ -137,8 +137,12 @@
                             }
                         } else {
                             // Server returned error message
-                            errorMsg.textContent = ajax.responseText;
-                            form.classList.add('is-error');
+                            var reader = new FileReader();
+                            reader.onload = function() {
+                                errorMsg.textContent = reader.result;
+                                form.classList.add('is-error');
+                            }
+                            reader.readAsText(ajax.response);
                         }
                     }
                 };
