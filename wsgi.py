@@ -1,4 +1,4 @@
-from markdown import application
+from markdown import app
 
 if __name__ == "__main__":
-    application.run()
+    app.run()
