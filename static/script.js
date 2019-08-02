@@ -91,6 +91,7 @@
 
                 // ajax request
                 var ajax = new XMLHttpRequest();
+                ajax.responseType = 'blob';
                 ajax.open(form.getAttribute('method'), form.getAttribute('action'), true);
 
                 ajax.onload = function() {
@@ -135,6 +136,7 @@
                                 setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 100); // cleanup
                             }
                         } else {
+                            // Server returned error message
                             errorMsg.textContent = ajax.responseText;
                             form.classList.add('is-error');
                         }
