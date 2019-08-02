@@ -43,8 +43,7 @@ def root():
                     # Get file name and file type
                     filename = path.splitext(file.filename)[0]
                     file_type = path.splitext(file.filename)[1].strip('.')
-                    print(filename)
-                    print(file_type)
+                    
                     try:  # Convert to markdown
                         markdown = convert_text(file.stream.read(), 'md', file_type)
                     except RuntimeError as e:
