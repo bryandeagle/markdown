@@ -1,11 +1,29 @@
-from flask import Flask, request, send_file, Response, flash, render_template
-from pypandoc import convert_text
-from os import path
+from logging import handlers, Formatter, getLogger, DEBUG
+from flask import Flask, request, send_file, Response
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+from pypandoc import convert_text
 from time import time, localtime
 from io import BytesIO
+from os import path
+
+
+def _setup_log(file_size):
+    """ Set up rotating log file configuration """
+    log_file = '{}.log'.format(path.basename(__file__)[0:-3])
+    formatter = Formatter(fmt='[%(asctime)s] [%(levelname)s] %(message)s',
+                          datefmt='%Y-%m-%d %H:%M:%S')
+    file_handler = handlers.RotatingFileHandler(filename=log_file,
+                                                maxBytes=file_size)
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(DEBUG)
+    log = getLogger(__name__)
+    log.addHandler(file_handler)
+    log.setLevel(DEBUG)
+    return log
+
 
 app = Flask(__name__)
+log = _setup_log(file_size=5*1024*1024)
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -19,6 +37,7 @@ def root():
             return 'No files uploaded'
         elif len(file_list) == 1:
             file = file_list[0]
+            log.info('Converting file {}'.format(file.filename))
             # Get file name and type
             filename = path.splitext(file.filename)[0]
             file_type = path.splitext(file.filename)[1].strip('.')
@@ -27,18 +46,21 @@ def root():
                 markdown = convert_text(file.stream.read(), 'md', file_type)
             except RuntimeError as e:
                 if e.args[0].startswith('Invalid input format!'):
+                    log.error('Invalid input format!')
                     return 'Unsupported file type: {}'.format(file_type.upper())
                 else:
+                    log.error(e.args[0])
                     return 'Unknown Error'
 
             # Send markdown file as attachment
             return Response(markdown, mimetype='text/markdown',
                             headers={'Content-Disposition': 'attachment;filename={}.md'.format(filename)})
 
-        elif len(file_list) > 1:  # Return zip file
+        else:  # Return zip file
             memory_file = BytesIO()
             with ZipFile(memory_file, 'w') as zf:
                 for file in file_list:
+                    log.info('Converting file {}'.format(file.filename))
 
                     # Get file name and file type
                     filename = path.splitext(file.filename)[0]
@@ -47,9 +69,12 @@ def root():
                     try:  # Convert to markdown
                         markdown = convert_text(file.stream.read(), 'md', file_type)
                     except RuntimeError as e:
+
                         if e.args[0].startswith('Invalid input format!'):
+                            log.error('Invalid input format!')
                             return 'Unsupported file type: {}'.format(file_type.upper())
                         else:
+                            log.error(e.args[0])
                             return 'Unknown Error'
 
                     # Write File to Zipfile
@@ -61,8 +86,6 @@ def root():
             # Send zip file as attachment
             memory_file.seek(0)
             return send_file(memory_file, attachment_filename='Markdown.zip', as_attachment=True)
-        else:
-            return 'Unknown Error'
 
 
 if __name__ == "__main__":
