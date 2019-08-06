@@ -1,29 +1,35 @@
 from logging import handlers, Formatter, getLogger, DEBUG
-from flask import Flask, request, send_file, Response
+from flask import Flask, request, send_file, Response, send_from_directory
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 from pypandoc import convert_text
 from time import time, localtime
 from io import BytesIO
 from os import path
 
+LOG_FILE = '{}.log'.format(path.basename(__file__)[0:-3])
+
 
 def _setup_log(file_size):
     """ Set up rotating log file configuration """
-    log_file = '{}.log'.format(path.basename(__file__)[0:-3])
     formatter = Formatter(fmt='[%(asctime)s] [%(levelname)s] %(message)s',
                           datefmt='%Y-%m-%d %H:%M:%S')
-    file_handler = handlers.RotatingFileHandler(filename=log_file,
+    file_handler = handlers.RotatingFileHandler(filename=LOG_FILE,
                                                 maxBytes=file_size)
     file_handler.setFormatter(formatter)
     file_handler.setLevel(DEBUG)
-    log = getLogger(__name__)
-    log.addHandler(file_handler)
-    log.setLevel(DEBUG)
-    return log
+    logger = getLogger(__name__)
+    logger.addHandler(file_handler)
+    logger.setLevel(DEBUG)
+    return logger
 
 
 app = Flask(__name__)
 log = _setup_log(file_size=5*1024*1024)
+
+
+@app.route('/log')
+def get_log():
+    return send_file(LOG_FILE, as_attachment=True)
 
 
 @app.route('/', methods=['GET', 'POST'])
